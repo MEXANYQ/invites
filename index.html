@@ -285,6 +285,20 @@
 
 <script>
 'use strict';
+/* Версия приложения. При открытии сверяемся с сайтом: если там новее — сразу загружаем её,
+   чтобы Telegram не показывал устаревшую копию из своего кэша. */
+const BUILD = '3';
+(async () => {
+  try {
+    const html = await (await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })).text();
+    const live = (html.match(/const BUILD = '([^']+)'/) || [])[1];
+    const url = new URL(location.href);
+    if (live && live !== BUILD && url.searchParams.get('v') !== live) {
+      url.searchParams.set('v', live);
+      location.replace(url.toString());
+    }
+  } catch (e) {}
+})();
 const $ = s => document.querySelector(s);
 const ICON = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
