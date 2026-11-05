@@ -287,7 +287,7 @@
 'use strict';
 /* Версия приложения. При открытии сверяемся с сайтом: если там новее — сразу загружаем её,
    чтобы Telegram не показывал устаревшую копию из своего кэша. */
-const BUILD = '3';
+const BUILD = '4';
 (async () => {
   try {
     const html = await (await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })).text();
@@ -600,7 +600,8 @@ function renderUsage() {
   const where = KV.cloud ? 'Облако Telegram' : 'Открыто вне Telegram — данные только в этом браузере';
   const fmt = n => n.toLocaleString('ru-RU');
   $('#usage').textContent = `${where} · ${fmt(invites.length)} инвайтов · занято ${Math.max(u.used ? 1 : 0, Math.round(u.pct * 100))}% · влезет ещё ≈ ${fmt(u.left)}`
-    + (HAS_ZIP ? '' : ' · сжатие недоступно на этом устройстве');
+    + (HAS_ZIP ? '' : ' · сжатие недоступно на этом устройстве')
+    + (IN_TG ? ` · Telegram ${tg.platform}, API ${tg.version}, версия приложения ${BUILD}` : ` · версия приложения ${BUILD}`);
   $('#meter').style.width = Math.min(100, u.pct * 100).toFixed(1) + '%';
 }
 
@@ -715,7 +716,7 @@ function renderChips() {
     (topics.length || cnt.none !== matched.length ? chip('none', 'Без темы') : '') +
     `<button class="chip tool" data-tool="new" title="Новая тема">${ICON.plus}${topics.length ? '' : 'Тема'}</button>` +
     (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '') +
-    (CAN_FULL ? `<button class="chip tool" data-tool="window" title="${isFull() ? 'Обычное окно' : 'На весь экран'}">${isFull() ? ICON.shrink : ICON.expand}${isFull() ? '' : 'Весь экран'}</button>` : '');
+    (IN_TG ? `<button class="chip tool" data-tool="window" title="${isFull() ? 'Обычное окно' : 'На весь экран'}">${isFull() ? ICON.shrink : ICON.expand}${isFull() ? 'Обычное окно' : 'Весь экран'}</button>` : '');
   $('#topics .chip.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 function topicOptions(selected) {
@@ -747,9 +748,10 @@ const CAN_FULL = ver('8.0');
 const DESKTOP = IN_TG && ['tdesktop', 'macos', 'web', 'weba', 'webk', 'unigram'].includes(tg.platform);
 const isFull = () => CAN_FULL && !!tg.isFullscreen;
 const winPref = () => local.get('iv-window', 'auto');
+const NO_FULL_MSG = () => `Ваш Telegram (${IN_TG ? tg.platform + ', API ' + tg.version : 'браузер'}) не умеет открывать мини-приложения на весь экран — обновите Telegram`;
 function syncWinUI() {
   document.querySelectorAll('#winSeg button').forEach(b => b.classList.toggle('on', b.dataset.win === winPref()));
-  $('#winRow').style.display = CAN_FULL ? '' : 'none';
+  $('#winRow').style.display = IN_TG ? '' : 'none';
 }
 function applyWindowPref() {
   if (!CAN_FULL) return;
@@ -757,12 +759,17 @@ function applyWindowPref() {
   try { if (want && !tg.isFullscreen) tg.requestFullscreen(); else if (!want && tg.isFullscreen) tg.exitFullscreen(); } catch (e) {}
 }
 function toggleFull() {
+  if (!CAN_FULL) return toast(NO_FULL_MSG());
   const goFull = !isFull();
   local.set('iv-window', goFull ? 'full' : 'normal');
   syncWinUI();
   try { goFull ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) {}
 }
-$('#winSeg').onclick = e => { const w = e.target.dataset.win; if (!w) return; local.set('iv-window', w); syncWinUI(); applyWindowPref(); };
+$('#winSeg').onclick = e => {
+  const w = e.target.dataset.win; if (!w) return;
+  if (!CAN_FULL && w !== 'normal') toast(NO_FULL_MSG());
+  local.set('iv-window', w); syncWinUI(); applyWindowPref();
+};
 if (CAN_FULL) {
   tg.onEvent('fullscreenChanged', () => renderChips());
   tg.onEvent('fullscreenFailed', ev => {
