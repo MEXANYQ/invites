@@ -44,6 +44,7 @@
     display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
     border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
   }
+  .icon-btn[hidden] { display: none; }
   .search {
     display: flex; align-items: center; gap: 8px; padding: 0 12px;
     background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
@@ -198,6 +199,7 @@
       <button class="icon-btn" id="openSettings" title="Цвета, вид, импорт">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/></svg>
       </button>
+      <button class="icon-btn" id="winToggle" title="Весь экран" hidden></button>
     </div>
     <label class="search" id="searchBox">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -287,7 +289,7 @@
 'use strict';
 /* Версия приложения. При открытии сверяемся с сайтом: если там новее — сразу загружаем её,
    чтобы Telegram не показывал устаревшую копию из своего кэша. */
-const BUILD = '4';
+const BUILD = '5';
 (async () => {
   try {
     const html = await (await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })).text();
@@ -715,8 +717,7 @@ function renderChips() {
     chip('all', 'Все') + topics.map(t => chip(t.id, t.name, t.color)).join('') +
     (topics.length || cnt.none !== matched.length ? chip('none', 'Без темы') : '') +
     `<button class="chip tool" data-tool="new" title="Новая тема">${ICON.plus}${topics.length ? '' : 'Тема'}</button>` +
-    (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '') +
-    (IN_TG ? `<button class="chip tool" data-tool="window" title="${isFull() ? 'Обычное окно' : 'На весь экран'}">${isFull() ? ICON.shrink : ICON.expand}${isFull() ? 'Обычное окно' : 'Весь экран'}</button>` : '');
+    (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '');
   $('#topics .chip.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 function topicOptions(selected) {
@@ -737,7 +738,6 @@ function setActive(id) {
 $('#topics').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.topic) return setActive(b.dataset.topic);
-  if (b.dataset.tool === 'window') return toggleFull();
   if (b.dataset.tool) openTopics(b.dataset.tool === 'new');
 });
 
@@ -752,7 +752,12 @@ const NO_FULL_MSG = () => `Ваш Telegram (${IN_TG ? tg.platform + ', API ' + t
 function syncWinUI() {
   document.querySelectorAll('#winSeg button').forEach(b => b.classList.toggle('on', b.dataset.win === winPref()));
   $('#winRow').style.display = IN_TG ? '' : 'none';
+  const btn = $('#winToggle');                       // значок в шапке, справа от «Цвета и вид»
+  btn.hidden = !IN_TG;
+  btn.innerHTML = isFull() ? ICON.shrink : ICON.expand;
+  btn.title = isFull() ? 'Обычное окно' : 'Весь экран';
 }
+$('#winToggle').onclick = () => toggleFull();
 function applyWindowPref() {
   if (!CAN_FULL) return;
   const p = winPref(), want = p === 'full' || (p === 'auto' && DESKTOP);
@@ -771,7 +776,7 @@ $('#winSeg').onclick = e => {
   local.set('iv-window', w); syncWinUI(); applyWindowPref();
 };
 if (CAN_FULL) {
-  tg.onEvent('fullscreenChanged', () => renderChips());
+  tg.onEvent('fullscreenChanged', () => syncWinUI());
   tg.onEvent('fullscreenFailed', ev => {
     if (ev && ev.error === 'UNSUPPORTED') toast('Этот Telegram не умеет открывать приложения на весь экран — обновите его');
   });
