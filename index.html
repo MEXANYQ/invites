@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>База инвайтов</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0f1115; --surface: #181b22; --text: #e7e9ee; --accent: #4f8cff; --accent-text: #fff;
+    --fs: 15px;
+    --muted: color-mix(in srgb, var(--text) 55%, var(--bg));
+    --border: color-mix(in srgb, var(--text) 12%, transparent);
+    --surface-2: color-mix(in srgb, var(--surface) 88%, var(--text));
+    --mark: color-mix(in srgb, var(--accent) 38%, transparent);
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    height: var(--tg-viewport-stable-height, 100dvh);
+    background: var(--bg); color: var(--text);
+    font: var(--fs)/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  svg { width: 18px; height: 18px; flex: none; }
+
+  /* --- шапка + поиск --- */
+  header { background: var(--bg); padding: 10px 12px 8px; border-bottom: 1px solid var(--border); flex: none; }
+  .bar { max-width: 860px; margin: 0 auto; }
+  .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .top h1 { font-size: 16px; margin: 0; font-weight: 650; white-space: nowrap; }
+  .count { color: var(--muted); font-size: 13px; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn {
+    display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+  }
+  .search {
+    display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  }
+  .search:focus-within { border-color: var(--accent); }
+  .search svg { color: var(--muted); }
+  .search input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text);
+    font: inherit; font-size: max(16px, var(--fs)); padding: 8px 0;
+  }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .search .scope { font-size: 12px; color: var(--muted); white-space: nowrap; max-width: 35%; overflow: hidden; text-overflow: ellipsis; }
+  .search .clear { border: 0; background: none; color: var(--muted); padding: 4px; display: none; }
+  .search.has-q .clear { display: inline-grid; }
+
+  /* --- темы (чипы) --- */
+  .topics { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .topics::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--surface); white-space: nowrap;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+  .chip .n { font-size: 12px; opacity: .65; }
+  .chip.zero { opacity: .45; }
+  .chip.on { background: var(--accent); color: var(--accent-text); border-color: transparent; opacity: 1; }
+  .chip.on .dot { box-shadow: 0 0 0 2px var(--accent-text); }
+  .chip.tool { color: var(--muted); padding: 4px 8px; }
+  .chip.tool svg { width: 15px; height: 15px; }
+
+  /* --- лента --- */
+  main { flex: 1; overflow-y: auto; padding: 10px 12px 20px; overscroll-behavior: contain; }
+  #list { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 6px; }
+  .card .text { white-space: pre-wrap; word-wrap: break-word; cursor: copy; }
+  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .meta { display: flex; align-items: center; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .date { color: var(--muted); font-size: 12px; margin-right: auto; }
+  .badge {
+    border: 0; border-radius: 999px; padding: 1px 9px; font-size: 12px;
+    background: color-mix(in srgb, var(--c) 20%, transparent);
+    color: color-mix(in srgb, var(--c) 65%, var(--text));
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border: 1px solid var(--border); border-radius: 8px; background: transparent; font-size: 13px;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  .btn.primary:disabled { opacity: .45; cursor: default; }
+  .btn.ghost { padding: 6px 7px; color: var(--muted); border-color: transparent; }
+  .btn.done { background: #16a34a; color: #fff; border-color: transparent; }
+  @media (hover: hover) {
+    .icon-btn:hover, .chip:hover, .btn:hover { filter: brightness(1.12); }
+    .btn.ghost:hover { color: var(--text); }
+    .btn.danger:hover { color: #ef4444; }
+  }
+  .card textarea {
+    width: 100%; min-height: 90px; resize: vertical; font: inherit; font-size: max(16px, var(--fs)); color: var(--text);
+    background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px; outline: 0;
+  }
+  select {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; outline: 0; max-width: 200px;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 40px 12px; }
+  .empty .btn { margin-top: 12px; }
+  #sentinel { height: 1px; }
+
+  /* --- добавление --- */
+  footer {
+    flex: none; border-top: 1px solid var(--border); background: var(--bg);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  }
+  .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .composer textarea {
+    flex: 1 1 260px; min-width: 0; resize: none; max-height: 30vh; min-height: 42px; font: inherit;
+    font-size: max(16px, var(--fs)); color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 12px; outline: 0;
+  }
+  .composer textarea:focus { border-color: var(--accent); }
+  .crow { display: flex; gap: 8px; flex: 0 0 auto; }
+  .crow select { height: 42px; border-radius: var(--radius); max-width: 160px; }
+  .crow .btn { height: 42px; padding: 0 18px; font-size: 14px; border-radius: var(--radius); }
+  @media (max-width: 520px) {
+    .crow { flex: 1 1 100%; }
+    .crow select { flex: 1; max-width: none; }
+  }
+  .hint { max-width: 860px; margin: 5px auto 0; color: var(--muted); font-size: 11.5px; }
+
+  /* --- диалоги --- */
+  dialog {
+    border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text);
+    padding: 16px; width: min(440px, calc(100vw - 24px)); max-height: calc(100% - 24px); overflow-y: auto;
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  dialog h2 { margin: 0 0 12px; font-size: 17px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; padding: 6px 11px; font-size: 13px; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+  input[type=color] {
+    width: 44px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 8px;
+    background: none; cursor: pointer; flex: none;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+  input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface); outline: 1px solid var(--border); padding: 0; }
+  .dlg-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .note { color: var(--muted); font-size: 12px; }
+  input[type=range] { accent-color: var(--accent); width: 130px; }
+  .tlist { display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
+  .trow { display: flex; align-items: center; gap: 8px; }
+  .trow .tcount { color: var(--muted); font-size: 12px; min-width: 28px; text-align: right; }
+  .text-in {
+    flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; outline: 0;
+  }
+  .text-in:focus { border-color: var(--accent); }
+  .tnew { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .tlist .empty { padding: 12px; }
+
+  /* --- загрузка и уведомления --- */
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--muted); z-index: 30; }
+  #toast {
+    position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(10px);
+    background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 999px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: .18s; z-index: 40; max-width: calc(100vw - 32px); text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+
+<div id="loading">Загрузка базы…</div>
+
+<header>
+  <div class="bar">
+    <div class="top">
+      <h1>База инвайтов</h1>
+      <span class="count" id="count"></span>
+      <button class="icon-btn" id="themeToggle" title="Тёмная / светлая тема">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="openSettings" title="Цвета, вид, импорт">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/></svg>
+      </button>
+    </div>
+    <label class="search" id="searchBox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Поиск…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      <span class="scope" id="scope"></span>
+      <button class="clear" id="clearQ" title="Очистить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </label>
+    <nav class="topics" id="topics"></nav>
+  </div>
+</header>
+
+<main id="scroller">
+  <div id="list"></div>
+  <div id="sentinel"></div>
+</main>
+
+<footer>
+  <div class="composer">
+    <textarea id="newText" rows="1" placeholder="Новый инвайт…"></textarea>
+    <div class="crow">
+      <select id="newTopic" title="В какую тему добавить"></select>
+      <button class="btn primary" id="addBtn" disabled>Добавить</button>
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+</footer>
+
+<dialog id="settings">
+  <h2>Цвета и вид</h2>
+  <div class="row"><span>Тема</span>
+    <div class="seg" id="modeSeg"><button data-mode="tg">Telegram</button><button data-mode="dark">Тёмная</button><button data-mode="light">Светлая</button></div>
+  </div>
+  <div class="row"><span>Акцент</span>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="swatches" id="swatches"></div>
+      <input type="color" data-key="accent">
+    </div>
+  </div>
+  <div class="row"><span>Фон</span><input type="color" data-key="bg"></div>
+  <div class="row"><span>Карточки</span><input type="color" data-key="surface"></div>
+  <div class="row"><span>Текст</span><input type="color" data-key="text"></div>
+  <div class="row"><span>Размер текста</span>
+    <span style="display:flex;gap:8px;align-items:center"><input type="range" id="fs" min="12" max="22" step="1"><span id="fsVal"></span></span>
+  </div>
+  <div class="row"><span>Импорт базы<br><span class="note">из программы на ПК (.json)</span></span>
+    <button class="btn" id="importBtn">Выбрать файл…</button>
+    <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
+  </div>
+  <div class="row"><span>Резервная копия<br><span class="note">копирует всю базу как текст .json</span></span>
+    <button class="btn" id="backupBtn">Скопировать</button>
+  </div>
+  <div class="row"><span class="note" id="usage"></span></div>
+  <div class="dlg-foot">
+    <button class="btn" id="resetColors">Сбросить цвета</button>
+    <button class="btn primary" data-close>Готово</button>
+  </div>
+</dialog>
+
+<dialog id="topicsDlg">
+  <h2>Темы</h2>
+  <div class="tlist" id="tlist"></div>
+  <div class="tnew">
+    <input type="color" id="tnewColor" title="Цвет темы">
+    <input class="text-in" id="tnewName" placeholder="Новая тема" maxlength="60" enterkeyhint="done">
+    <button class="btn primary" id="tnewAdd">Создать</button>
+  </div>
+  <div class="dlg-foot">
+    <span class="note">Удаление темы не удаляет инвайты — они переходят в «Без темы».</span>
+    <button class="btn primary" data-close>Готово</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const ICON = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  del:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+};
+
+/* ================= Telegram ================= */
+const tg = window.Telegram && window.Telegram.WebApp;
+const IN_TG = !!(tg && tg.initData);
+const ver = v => IN_TG && tg.isVersionAtLeast(v);
+if (IN_TG) {
+  tg.ready(); tg.expand();
+  if (ver('7.7')) tg.disableVerticalSwipes();          // свайп вниз по ленте не закрывает приложение
+}
+const haptic = type => { try { if (ver('6.1')) tg.HapticFeedback.notificationOccurred(type); } catch (e) {} };
+const askConfirm = msg => new Promise(res => {
+  if (ver('6.2')) tg.showConfirm(msg.length > 250 ? msg.slice(0, 247) + '…' : msg, ok => res(!!ok));
+  else res(confirm(msg));
+});
+
+/* ================= Хранилище =================
+   Внутри Telegram — облако Telegram (CloudStorage): данные привязаны к вашему аккаунту
+   и этому боту, синхронизируются между устройствами, другие пользователи их не видят.
+   Лимиты Telegram: до 1024 ключей, до 4096 символов в каждом. Поэтому инвайты упакованы
+   «пачками» по ~4000 символов (ключи i0, i1, …), темы — в ключе topics, вид — в settings.
+   Вне Telegram (просто открыли в браузере) — localStorage, для проверки. */
+const cbP = (res, rej) => (err, val) => err ? rej(new Error(String(err))) : res(val);
+const KV = ver('6.9') ? {
+  cloud: true,
+  keys: () => new Promise((res, rej) => tg.CloudStorage.getKeys(cbP(res, rej))),
+  get: keys => new Promise((res, rej) => tg.CloudStorage.getItems(keys, cbP(res, rej))),
+  set: (k, v) => new Promise((res, rej) => tg.CloudStorage.setItem(k, v, cbP(res, rej))),
+  del: keys => new Promise((res, rej) => tg.CloudStorage.removeItems(keys, cbP(res, rej))),
+} : (() => {
+  const P = 'iv-local:';
+  let ls;
+  try { localStorage.setItem(P + 't', '1'); localStorage.removeItem(P + 't'); ls = localStorage; }
+  catch (e) { const m = new Map(); ls = { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)),
+    removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } }; }
+  return {
+    cloud: false,
+    keys: async () => { const o = []; for (let i = 0; i < ls.length; i++) { const k = ls.key(i); if (k && k.startsWith(P)) o.push(k.slice(P.length)); } return o; },
+    get: async keys => Object.fromEntries(keys.map(k => [k, ls.getItem(P + k) ?? ''])),
+    set: async (k, v) => { if (v.length > 4096) throw new Error('value too long'); ls.setItem(P + k, v); return true; },
+    del: async keys => { keys.forEach(k => ls.removeItem(P + k)); return true; },
+  };
+})();
+
+const LIMIT = 4000, MAX_CHUNKS = 1000;
+const chunks = new Map();   // ключ -> массив инвайтов
+const clen = new Map();     // ключ -> длина в символах
+let lastKey = null;
+const pack = it => [it.id, it.text, it.topic || null, it.created, it.updated];
+const serialize = arr => JSON.stringify(arr.map(pack));
+const recalc = k => clen.set(k, serialize(chunks.get(k) || []).length);
+const uid = (n = 12) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+const safeParse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
+const MAX_TEXT = LIMIT - 120;
+
+let chain = Promise.resolve();            // записи строго по очереди
+const serial = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
+
+function placeItem(it) {
+  const need = JSON.stringify(pack(it)).length + 1;
+  if (need + 2 > LIMIT) throw new Error('too-long');
+  if (lastKey && chunks.has(lastKey) && clen.get(lastKey) + need <= LIMIT) return lastKey;
+  for (const [k, l] of clen) if (l + need <= LIMIT) return (lastKey = k);
+  for (let n = 0; n < MAX_CHUNKS; n++) {
+    const k = 'i' + n;
+    if (!chunks.has(k)) { chunks.set(k, []); clen.set(k, 2); return (lastKey = k); }
+  }
+  throw new Error('full');
+}
+function attach(it) { const k = placeItem(it); chunks.get(k).push(it); it._c = k; recalc(k); return k; }
+function detach(it) { const arr = chunks.get(it._c); if (arr) { arr.splice(arr.indexOf(it), 1); recalc(it._c); } }
+
+async function writeChunk(k) {
+  const arr = chunks.get(k);
+  if (!arr || !arr.length) { chunks.delete(k); clen.delete(k); await KV.del([k]); return; }
+  const s = serialize(arr); clen.set(k, s.length); await KV.set(k, s);
+}
+
+async function loadAll() {
+  const keys = await KV.keys();
+  const want = keys.filter(k => /^i\d+$/.test(k) || k === 'topics' || k === 'settings');
+  const vals = {};
+  for (let i = 0; i < want.length; i += 50) Object.assign(vals, await KV.get(want.slice(i, i + 50)));
+  topics = safeParse(vals.topics, []).filter(t => t && t.id && t.name);
+  const tset = new Set(topics.map(t => t.id));
+  chunks.clear(); clen.clear(); lastKey = null;
+  const seen = new Map();
+  for (const k of want.filter(k => k[0] === 'i').sort((a, b) => a.slice(1) - b.slice(1))) {
+    const keep = [];
+    for (const a of safeParse(vals[k], [])) {
+      if (!Array.isArray(a) || !a[0] || typeof a[1] !== 'string' || seen.has(a[0])) continue;
+      const it = { id: a[0], text: a[1], topic: tset.has(a[2]) ? a[2] : null, created: +a[3] || 0, updated: +a[4] || +a[3] || 0, _c: k };
+      seen.set(it.id, it); keep.push(it);
+    }
+    chunks.set(k, keep); recalc(k);
+  }
+  invites = [...seen.values()].map(prep).sort((a, b) => b.created - a.created);
+  return safeParse(vals.settings, null);
+}
+
+async function failed(e) {
+  console.error(e);
+  const m = String(e && e.message);
+  toast(m === 'full' ? 'Облако Telegram заполнено (≈4 МБ)' : m === 'too-long' ? `Слишком длинный текст (макс. ${MAX_TEXT} символов)` : 'Не удалось сохранить — проверьте интернет');
+  haptic('error');
+  try { await loadAll(); refreshAll(); } catch (e2) {}
+}
+
+const saveTopics = () => {
+  const s = JSON.stringify(topics);
+  if (s.length > 4096) throw new Error('topics-full');
+  return KV.set('topics', s);
+};
+
+function usage() {
+  let used = 0; for (const l of clen.values()) used += l;
+  const pct = Math.max(used ? 1 : 0, Math.round(used / (MAX_CHUNKS * LIMIT) * 100));
+  return `${KV.cloud ? 'Хранится в облаке Telegram' : 'Открыто вне Telegram — данные только в этом браузере'} · занято ${pct}% (${invites.length} инвайтов)`;
+}
+
+/* ================= Оформление ================= */
+const DEFAULTS = {
+  dark:  { bg: '#0f1115', surface: '#181b22', text: '#e7e9ee', accent: '#4f8cff' },
+  light: { bg: '#f3f4f6', surface: '#ffffff', text: '#1b1d22', accent: '#2f6fec' },
+};
+const ACCENTS = ['#4f8cff', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6'];
+let settings = { mode: 'tg', colors: { tg: {}, dark: {}, light: {} }, fontSize: 15 };
+const hex = c => /^#[0-9a-f]{6}$/i.test(c || '') ? c : null;
+
+function tgPalette() {
+  const p = (IN_TG && tg.themeParams) || {};
+  const dark = IN_TG ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const b = DEFAULTS[dark ? 'dark' : 'light'];
+  return {
+    bg: hex(p.secondary_bg_color) || hex(p.bg_color) || b.bg,
+    surface: hex(p.section_bg_color) || hex(p.bg_color) || b.surface,
+    text: hex(p.text_color) || b.text,
+    accent: hex(p.button_color) || b.accent,
+    scheme: dark ? 'dark' : 'light',
+  };
+}
+function palette() {
+  const base = settings.mode === 'tg' ? tgPalette() : { ...DEFAULTS[settings.mode], scheme: settings.mode };
+  return { ...base, ...(settings.colors[settings.mode] || {}) };
+}
+function readableOn(h) {
+  const n = parseInt(h.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#111111' : '#ffffff';
+}
+function applyTheme() {
+  const p = palette();
+  const vars = { '--bg': p.bg, '--surface': p.surface, '--text': p.text, '--accent': p.accent,
+    '--accent-text': readableOn(p.accent), '--fs': settings.fontSize + 'px', 'color-scheme': p.scheme };
+  for (const k in vars) document.documentElement.style.setProperty(k, vars[k]);
+  try {
+    if (ver('6.9')) { tg.setHeaderColor(p.bg); tg.setBackgroundColor(p.bg); }
+    if (ver('7.10')) tg.setBottomBarColor(p.bg);
+  } catch (e) {}
+  syncSettingsUI();
+}
+let saveTimer;
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => serial(() => KV.set('settings', JSON.stringify(settings))).catch(() => {}), 600);
+}
+function syncSettingsUI() {
+  const p = palette();
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === settings.mode));
+  document.querySelectorAll('#settings input[type=color]').forEach(i => i.value = p[i.dataset.key]);
+  $('#fs').value = settings.fontSize; $('#fsVal').textContent = settings.fontSize + 'px';
+}
+function setColor(key, value) { (settings.colors[settings.mode] ||= {})[key] = value; applyTheme(); saveSettings(); }
+
+$('#swatches').innerHTML = ACCENTS.map(c => `<button style="background:${c}" data-c="${c}"></button>`).join('');
+$('#swatches').onclick = e => { const c = e.target.dataset.c; if (c) setColor('accent', c); };
+document.querySelectorAll('#settings input[type=color]').forEach(i => i.oninput = () => setColor(i.dataset.key, i.value));
+$('#modeSeg').onclick = e => { const m = e.target.dataset.mode; if (m) { settings.mode = m; applyTheme(); saveSettings(); } };
+$('#themeToggle').onclick = () => { settings.mode = palette().scheme === 'dark' ? 'light' : 'dark'; applyTheme(); saveSettings(); };
+$('#fs').oninput = e => { settings.fontSize = +e.target.value; applyTheme(); saveSettings(); };
+$('#resetColors').onclick = () => { settings.colors[settings.mode] = {}; applyTheme(); saveSettings(); };
+if (IN_TG) tg.onEvent('themeChanged', applyTheme);
+
+/* --- диалоги + кнопка «Назад» Telegram --- */
+function openDialog(d) { d.showModal(); syncBack(); }
+function syncBack() { if (ver('6.1')) document.querySelector('dialog[open]') ? tg.BackButton.show() : tg.BackButton.hide(); }
+if (ver('6.1')) tg.BackButton.onClick(() => { const d = document.querySelector('dialog[open]'); if (d) d.close(); });
+document.querySelectorAll('dialog').forEach(d => {
+  d.addEventListener('close', syncBack);
+  d.addEventListener('click', e => {
+    const r = d.getBoundingClientRect();
+    const outside = e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+    if (outside || e.target.closest('[data-close]')) d.close();
+  });
+});
+const openSettings = () => { $('#usage').textContent = usage(); openDialog($('#settings')); };
+$('#openSettings').onclick = openSettings;
+if (ver('7.0')) { tg.SettingsButton.show(); tg.SettingsButton.onClick(openSettings); }
+
+/* ================= Данные ================= */
+let invites = [];      // новые сверху
+let topics = [];       // [{id, name, color}]
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+let active = store.get('iv-topic', 'all');
+let terms = [], matched = [], filtered = [], shown = 0;
+const PAGE = 100;
+
+const norm = s => s.toLowerCase().replace(/ё/g, 'е');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function prep(it) { it._n = norm(it.text); return it; }
+const byId = id => invites.find(i => i.id === id);
+const topicById = id => topics.find(t => t.id === id);
+const topicName = id => id === 'all' ? 'Все' : id === 'none' || !id ? 'Без темы' : (topicById(id)?.name ?? '?');
+const inActive = it => active === 'all' || (active === 'none' ? !it.topic : it.topic === active);
+const matchesTerms = it => terms.every(t => it._n.includes(t));
+const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/* ================= Темы: чипы и списки ================= */
+function renderChips() {
+  const cnt = { all: matched.length, none: 0 };
+  topics.forEach(t => cnt[t.id] = 0);
+  for (const it of matched) (it.topic && it.topic in cnt) ? cnt[it.topic]++ : cnt.none++;
+  const chip = (id, name, color) => {
+    const cls = ['chip', active === id && 'on', terms.length && !cnt[id] && 'zero'].filter(Boolean).join(' ');
+    const dot = color ? `<span class="dot" style="--c:${color}"></span>` : '';
+    return `<button class="${cls}" data-topic="${id}">${dot}${esc(name)}<span class="n">${cnt[id]}</span></button>`;
+  };
+  $('#topics').innerHTML =
+    chip('all', 'Все') + topics.map(t => chip(t.id, t.name, t.color)).join('') +
+    (topics.length || cnt.none !== matched.length ? chip('none', 'Без темы') : '') +
+    `<button class="chip tool" data-tool="new" title="Новая тема">${ICON.plus}${topics.length ? '' : 'Тема'}</button>` +
+    (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '');
+  $('#topics .chip.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function topicOptions(selected) {
+  return `<option value="">Без темы</option>` +
+    topics.map(t => `<option value="${t.id}" ${t.id === selected ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
+}
+function renderTopicSelect() {
+  const sel = $('#newTopic');
+  const want = active !== 'all' && active !== 'none' ? active : (topicById(sel.value) ? sel.value : '');
+  sel.innerHTML = topicOptions(want);
+  sel.style.display = topics.length ? '' : 'none';
+}
+function setActive(id) {
+  if (id !== 'all' && id !== 'none' && !topicById(id)) id = 'all';
+  active = id; store.set('iv-topic', id);
+  renderTopicSelect(); applyFilter();
+}
+$('#topics').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.topic) return setActive(b.dataset.topic);
+  if (b.dataset.tool) openTopics(b.dataset.tool === 'new');
+});
+
+/* ================= Поиск и лента ================= */
+function highlight(text, n) {
+  if (!terms.length || n.length !== text.length) return esc(text);
+  const ranges = [];
+  for (const t of terms) { let i = n.indexOf(t); while (i !== -1) { ranges.push([i, i + t.length]); i = n.indexOf(t, i + t.length); } }
+  ranges.sort((a, b) => a[0] - b[0]);
+  let out = '', pos = 0;
+  for (const [s, e] of ranges) {
+    if (e <= pos) continue;
+    const from = Math.max(s, pos);
+    out += esc(text.slice(pos, from)) + '<mark>' + esc(text.slice(from, e)) + '</mark>';
+    pos = e;
+  }
+  return out + esc(text.slice(pos));
+}
+function cardHTML(it) {
+  const edited = it.updated - it.created > 1000 ? ' · изм.' : '';
+  const t = it.topic && topicById(it.topic);
+  const badge = t && active === 'all' ? `<button class="badge" data-act="goto" style="--c:${t.color}">${esc(t.name)}</button>` : '';
+  return `<article class="card" data-id="${it.id}">
+    <div class="text">${highlight(it.text, it._n)}</div>
+    <div class="meta">
+      ${badge}<span class="date">${dateFmt.format(it.created)}${edited}</span>
+      <button class="btn primary" data-act="copy">${ICON.copy}Копировать</button>
+      <button class="btn ghost" data-act="share" title="Отправить в чат">${ICON.send}</button>
+      <button class="btn ghost" data-act="edit" title="Редактировать / сменить тему">${ICON.edit}</button>
+      <button class="btn ghost danger" data-act="del" title="Удалить">${ICON.del}</button>
+    </div></article>`;
+}
+function updateCount() {
+  const total = active === 'all' ? invites.length : invites.filter(inActive).length;
+  $('#count').textContent = terms.length ? `найдено ${filtered.length} из ${total}` : `${total} шт.`;
+  $('#scope').textContent = active === 'all' ? '' : `в «${topicName(active)}»`;
+  $('#q').placeholder = active === 'all' ? 'Поиск по всем темам…' : 'Поиск внутри темы…';
+}
+function emptyHTML(q) {
+  if (terms.length) {
+    const elsewhere = active !== 'all' ? matched.length : 0;
+    return `<div class="empty">Ничего не найдено по «${esc(q)}»${active !== 'all' ? ` в теме «${esc(topicName(active))}»` : ''}.
+      ${elsewhere ? `<br><button class="btn" data-goto="all">Найдено в других темах: ${elsewhere} — показать</button>` : ''}</div>`;
+  }
+  if (!invites.length) return '<div class="empty">База пуста. Добавьте первый инвайт внизу<br>или импортируйте базу с ПК (кнопка с палитрой).</div>';
+  return `<div class="empty">В теме «${esc(topicName(active))}» пока нет инвайтов.<br>Новый инвайт, добавленный сейчас, попадёт сюда.</div>`;
+}
+function applyFilter() {
+  const q = $('#q').value;
+  $('#searchBox').classList.toggle('has-q', q.length > 0);
+  terms = norm(q).split(/\s+/).filter(Boolean);
+  matched = terms.length ? invites.filter(matchesTerms) : invites;
+  filtered = matched.filter(inActive);
+  shown = 0;
+  $('#scroller').scrollTop = 0;
+  $('#list').innerHTML = filtered.length ? '' : emptyHTML(q.trim());
+  renderMore(); renderChips(); updateCount();
+}
+const refreshCounts = () => { renderChips(); updateCount(); };
+function refreshAll() { renderTopicSelect(); applyFilter(); }
+function renderMore() {
+  if (shown >= filtered.length) return;
+  const chunk = filtered.slice(shown, shown + PAGE);
+  $('#list').insertAdjacentHTML('beforeend', chunk.map(cardHTML).join(''));
+  shown += chunk.length;
+}
+new IntersectionObserver(es => { if (es[0].isIntersecting) renderMore(); }, { root: $('#scroller'), rootMargin: '600px' }).observe($('#sentinel'));
+
+$('#q').addEventListener('input', applyFilter);
+$('#q').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { $('#q').value = ''; applyFilter(); }
+  if (e.key === 'Enter') { e.preventDefault(); $('#q').blur(); }   // на телефоне — спрятать клавиатуру
+});
+$('#clearQ').onclick = e => { e.preventDefault(); $('#q').value = ''; applyFilter(); $('#q').focus(); };
+
+/* ================= Копирование, отправка, уведомления ================= */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  haptic('success');
+}
+function shareText(text) {
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(text);
+  if (IN_TG) tg.openTelegramLink(url); else window.open(url, '_blank');
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
+}
+
+/* ================= Действия с карточками ================= */
+function dropFromView(it, card) {
+  filtered = filtered.filter(i => i !== it);
+  shown = Math.max(0, shown - 1);
+  card.remove();
+  if (!filtered.length) $('#list').innerHTML = emptyHTML($('#q').value.trim());
+}
+$('#list').addEventListener('click', async e => {
+  const goto = e.target.closest('[data-goto]');
+  if (goto) return setActive(goto.dataset.goto);
+  const card = e.target.closest('.card'); if (!card) return;
+  const it = byId(card.dataset.id); if (!it) return;
+  const act = e.target.closest('[data-act]')?.dataset.act;
+
+  if (!act && e.target.closest('.text') && !card.classList.contains('editing')) {
+    if (String(getSelection())) return;
+    await copyText(it.text); toast('Скопировано'); return;
+  }
+  if (act === 'copy') {
+    await copyText(it.text);
+    const b = e.target.closest('button'); b.classList.add('done'); b.lastChild.textContent = 'Скопировано';
+    setTimeout(() => { b.classList.remove('done'); b.lastChild.textContent = 'Копировать'; }, 1200);
+  }
+  if (act === 'share') shareText(it.text);
+  if (act === 'goto') setActive(it.topic);
+  if (act === 'del') {
+    if (!await askConfirm('Удалить этот инвайт?\n\n' + it.text.slice(0, 150))) return;
+    try {
+      await serial(async () => { const k = it._c; detach(it); await writeChunk(k); });
+    } catch (err) { return failed(err); }
+    invites = invites.filter(i => i !== it);
+    matched = terms.length ? matched.filter(i => i !== it) : invites;
+    dropFromView(it, card); refreshCounts(); toast('Удалено');
+  }
+  if (act === 'edit') startEdit(card, it);
+  if (act === 'save') saveEdit(card, it);
+  if (act === 'cancel') card.outerHTML = cardHTML(it);
+});
+
+function startEdit(card, it) {
+  card.classList.add('editing');
+  card.innerHTML = `<textarea maxlength="${MAX_TEXT}">${esc(it.text)}</textarea>
+    <div class="meta">
+      <select title="Тема">${topicOptions(it.topic)}</select>
+      <span class="date"></span>
+      <button class="btn" data-act="cancel">Отмена</button>
+      <button class="btn primary" data-act="save">Сохранить</button></div>`;
+  const ta = card.querySelector('textarea');
+  ta.style.height = Math.min(ta.scrollHeight + 4, innerHeight * 0.5) + 'px';
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  card.onkeydown = e => {
+    if (isSubmitKey(e) && e.target.tagName === 'TEXTAREA') { e.preventDefault(); saveEdit(card, it); }
+    if (e.key === 'Escape') { e.preventDefault(); card.outerHTML = cardHTML(it); }
+  };
+}
+async function saveEdit(card, it) {
+  const text = card.querySelector('textarea').value.trim();
+  const topic = card.querySelector('select').value || null;
+  if (!text) return toast('Текст пустой — для удаления используйте корзину');
+  if (invites.some(i => i !== it && i.text === text)) return toast('Точно такой же инвайт уже есть в базе');
+  const moved = it.topic !== topic;
+  try {
+    await serial(async () => {
+      Object.assign(it, { text, topic, updated: Date.now() }); prep(it);
+      const k = it._c; recalc(k);
+      if (clen.get(k) <= LIMIT) return writeChunk(k);
+      detach(it); const nk = attach(it);              // не влезает — переносим в другую пачку
+      await writeChunk(nk); await writeChunk(k);
+    });
+  } catch (err) { return failed(err); }
+  if (terms.length && !matchesTerms(it)) matched = matched.filter(i => i !== it);
+  if (!inActive(it) || (terms.length && !matchesTerms(it))) {
+    dropFromView(it, card);
+    toast(moved ? `Перенесено в «${topicName(it.topic)}»` : 'Сохранено (больше не подходит под поиск)');
+  } else {
+    card.outerHTML = cardHTML(it);
+    toast(moved ? `Тема: «${topicName(it.topic)}»` : 'Сохранено');
+  }
+  refreshCounts();
+}
+
+/* ================= Добавление ================= */
+// ПК: Enter — добавить, Shift+Enter — новая строка. Телефон: Enter — новая строка, добавлять кнопкой.
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+const isSubmitKey = e => !TOUCH && e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.isComposing;
+$('#hint').textContent = TOUCH
+  ? 'Тап по тексту — скопировать · ➤ — отправить в чат'
+  : 'Enter — добавить · Shift+Enter — новая строка · клик по тексту — скопировать';
+const newText = $('#newText');
+newText.maxLength = MAX_TEXT;
+function autosize() {
+  newText.style.height = 'auto';
+  newText.style.height = newText.scrollHeight + 2 + 'px';
+  $('#addBtn').disabled = !newText.value.trim();
+}
+newText.addEventListener('input', autosize);
+newText.addEventListener('keydown', e => { if (isSubmitKey(e)) { e.preventDefault(); add(); } });
+$('#addBtn').addEventListener('pointerdown', e => e.preventDefault());   // не прятать клавиатуру на телефоне
+$('#addBtn').onclick = add;
+
+let adding = false;
+async function add() {
+  const text = newText.value.trim(); if (!text || adding) return;
+  const dup = invites.find(i => i.text === text);
+  if (dup) { haptic('warning'); return toast(`Такой инвайт уже есть (тема «${topicName(dup.topic)}»)`); }
+  const now = Date.now();
+  const item = prep({ id: uid(), text, topic: $('#newTopic').value || null, created: now, updated: now });
+  adding = true; $('#addBtn').disabled = true;
+  try { await serial(async () => { const k = attach(item); try { await writeChunk(k); } catch (e) { detach(item); throw e; } }); }
+  catch (err) { adding = false; autosize(); return failed(err); }
+  adding = false;
+  invites.unshift(item);
+  newText.value = ''; autosize();
+  applyFilter(); haptic('success');
+  const where = topics.length ? ` в «${topicName(item.topic)}»` : '';
+  toast(filtered.includes(item) ? `Добавлено${where}` : `Добавлено${where} — скрыто фильтром`);
+}
+
+/* ================= Управление темами ================= */
+const nextColor = () => ACCENTS[topics.length % ACCENTS.length];
+function renderTopicList() {
+  const totals = {};
+  for (const it of invites) if (it.topic) totals[it.topic] = (totals[it.topic] || 0) + 1;
+  $('#tlist').innerHTML = topics.length ? topics.map(t => `
+    <div class="trow" data-id="${t.id}">
+      <input type="color" value="${t.color}">
+      <input class="text-in" value="${esc(t.name)}" maxlength="60" enterkeyhint="done">
+      <span class="tcount">${totals[t.id] || 0}</span>
+      <button class="btn ghost danger" data-act="tdel" title="Удалить тему">${ICON.del}</button>
+    </div>`).join('') : '<div class="empty">Тем пока нет — создайте первую ниже.</div>';
+}
+function openTopics(focusNew) {
+  renderTopicList();
+  $('#tnewColor').value = nextColor();
+  openDialog($('#topicsDlg'));
+  if (focusNew || !topics.length) $('#tnewName').focus();
+}
+async function createTopic() {
+  const name = $('#tnewName').value.trim().slice(0, 60); if (!name) return $('#tnewName').focus();
+  if (topics.some(t => t.name.toLowerCase() === name.toLowerCase())) return toast('Тема с таким названием уже есть');
+  const t = { id: uid(10), name, color: $('#tnewColor').value };
+  topics.push(t);
+  try { await serial(saveTopics); }
+  catch (err) { topics = topics.filter(x => x !== t); return toast(String(err.message) === 'topics-full' ? 'Слишком много тем' : 'Не удалось сохранить тему'); }
+  $('#tnewName').value = ''; $('#tnewColor').value = nextColor();
+  renderTopicList(); refreshAll(); toast(`Тема «${name}» создана`);
+}
+$('#tnewAdd').onclick = createTopic;
+$('#tnewName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createTopic(); } });
+
+async function updateTopic(t, patch, input) {
+  const before = { ...t };
+  Object.assign(t, patch);
+  try { await serial(saveTopics); }
+  catch (err) { Object.assign(t, before); if (input) input.value = t.name; return toast('Не удалось сохранить тему'); }
+  refreshAll();
+}
+$('#tlist').addEventListener('input', e => {
+  const t = topicById(e.target.closest('.trow')?.dataset.id);
+  if (t && e.target.type === 'color') { t.color = e.target.value; renderChips(); }
+});
+$('#tlist').addEventListener('change', e => {
+  const t = topicById(e.target.closest('.trow')?.dataset.id); if (!t) return;
+  if (e.target.type === 'color') return updateTopic(t, { color: e.target.value });
+  const name = e.target.value.trim().slice(0, 60);
+  if (!name || topics.some(x => x !== t && x.name.toLowerCase() === name.toLowerCase())) {
+    if (name) toast('Тема с таким названием уже есть');
+    e.target.value = t.name; return;
+  }
+  if (name !== t.name) updateTopic(t, { name }, e.target);
+});
+$('#tlist').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('text-in')) e.target.blur(); });
+$('#tlist').addEventListener('click', async e => {
+  if (!e.target.closest('[data-act=tdel]')) return;
+  const t = topicById(e.target.closest('.trow').dataset.id); if (!t) return;
+  const affected = invites.filter(i => i.topic === t.id);
+  if (!await askConfirm(`Удалить тему «${t.name}»?` + (affected.length ? `\n\n${affected.length} инвайт(ов) перейдут в «Без темы».` : ''))) return;
+  try {
+    await serial(async () => {
+      topics = topics.filter(x => x !== t);
+      await saveTopics();
+      const dirty = new Set();
+      affected.forEach(i => { i.topic = null; dirty.add(i._c); });
+      for (const k of dirty) { recalc(k); await writeChunk(k); }
+    });
+  } catch (err) { return failed(err); }
+  if (active === t.id) { active = 'all'; store.set('iv-topic', 'all'); }
+  renderTopicList(); refreshAll(); toast(`Тема «${t.name}» удалена`);
+});
+
+/* ================= Резервная копия ================= */
+$('#backupBtn').onclick = async () => {
+  const data = { invites: invites.map(({ id, text, topic, created, updated }) => ({ id, text, topic, created, updated })), topics };
+  await copyText(JSON.stringify(data, null, 1));
+  toast('Копия в буфере — вставьте в текстовый файл и сохраните как .json');
+};
+
+/* ================= Импорт с ПК ================= */
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  let inv = [], tps = [];
+  try {
+    for (const f of files) {
+      const d = JSON.parse(await f.text());
+      if (Array.isArray(d)) (d.length && d[0] && 'name' in d[0] ? tps : inv).push(...d);
+      else { if (Array.isArray(d.invites)) inv.push(...d.invites); if (Array.isArray(d.topics)) tps.push(...d.topics); }
+    }
+  } catch (err) { return toast('Не удалось прочитать файл — нужен .json из программы'); }
+
+  const idMap = {}, newTopics = [];
+  for (const t of tps) {
+    if (!t || !t.name) continue;
+    let ex = topics.find(x => x.name.toLowerCase() === String(t.name).toLowerCase());
+    if (!ex) { ex = { id: uid(10), name: String(t.name).slice(0, 60), color: hex(t.color) || nextColor() }; topics.push(ex); newTopics.push(ex); }
+    idMap[t.id] = ex.id;
+  }
+  const texts = new Set(invites.map(i => i.text));
+  const fresh = [];
+  let dupes = 0, tooLong = 0;
+  for (const x of inv) {
+    const text = typeof x?.text === 'string' ? x.text.trim() : '';
+    if (!text) continue;
+    if (texts.has(text)) { dupes++; continue; }
+    if (text.length > MAX_TEXT) { tooLong++; continue; }
+    texts.add(text);
+    const created = +x.created || Date.now();
+    fresh.push(prep({ id: uid(), text, topic: idMap[x.topic] || null, created, updated: +x.updated || created }));
+  }
+  if (!fresh.length && !newTopics.length) return toast(dupes ? 'Всё из файла уже есть в базе' : 'В файле не найдено инвайтов');
+
+  let added = 0;
+  try {
+    await serial(async () => {
+      if (newTopics.length) await saveTopics();
+      const dirty = new Set();
+      for (const it of fresh) { dirty.add(attach(it)); }
+      let n = 0;
+      for (const k of dirty) { toast(`Импорт… ${Math.round(++n / dirty.size * 100)}%`); await writeChunk(k); }
+      added = fresh.length;
+    });
+  } catch (err) { return failed(err); }
+  invites.push(...fresh);
+  invites.sort((a, b) => b.created - a.created);
+  $('#usage').textContent = usage();
+  refreshAll(); haptic('success');
+  toast(`Импортировано: ${added}` + (newTopics.length ? `, тем: ${newTopics.length}` : '') +
+        (dupes ? ` · уже были: ${dupes}` : '') + (tooLong ? ` · слишком длинных: ${tooLong}` : ''));
+};
+
+/* ================= Горячие клавиши (ПК) ================= */
+document.addEventListener('keydown', e => {
+  const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' || (e.key === '/' && !inField)) {
+    e.preventDefault(); $('#q').focus(); $('#q').select();
+  }
+  if (e.altKey && /^Digit\d$/.test(e.code) && !document.querySelector('dialog[open]')) {
+    e.preventDefault();
+    const n = +e.code.slice(5);
+    if (n === 0) setActive('all'); else if (topics[n - 1]) setActive(topics[n - 1].id);
+  }
+});
+
+/* ================= Старт ================= */
+(async () => {
+  applyTheme();
+  try {
+    const s = await loadAll();
+    if (s) settings = { ...settings, ...s, colors: { tg: {}, dark: {}, light: {}, ...(s.colors || {}) } };
+  } catch (err) {
+    console.error(err);
+    $('#loading').textContent = 'Не удалось загрузить базу из облака Telegram. Проверьте интернет и откройте приложение заново.';
+    return;
+  }
+  applyTheme();
+  setActive(active);
+  $('#loading').remove();
+  if (!TOUCH) $('#q').focus();
+})();
+</script>
+</body>
+</html>
