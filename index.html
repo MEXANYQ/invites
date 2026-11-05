@@ -29,11 +29,17 @@
   svg { width: 18px; height: 18px; flex: none; }
 
   /* --- шапка + поиск --- */
-  header { background: var(--bg); padding: 10px 12px 8px; border-bottom: 1px solid var(--border); flex: none; }
+  /* в полноэкранном режиме Telegram рисует свои кнопки поверх — отступаем на его «безопасные зоны» */
+  header {
+    background: var(--bg); border-bottom: 1px solid var(--border); flex: none;
+    padding: calc(10px + var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)) 12px 8px;
+  }
   .bar { max-width: 860px; margin: 0 auto; }
   .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .top h1 { font-size: 16px; margin: 0; font-weight: 650; white-space: nowrap; }
-  .count { color: var(--muted); font-size: 13px; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sync { font-size: 12px; color: var(--muted); margin-right: auto; white-space: nowrap; }
+  .sync.err { color: #ef4444; }
   .icon-btn {
     display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
     border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
@@ -74,9 +80,12 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 6px; }
   .card .text { white-space: pre-wrap; word-wrap: break-word; cursor: copy; }
   mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
-  .meta { display: flex; align-items: center; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-  .date { color: var(--muted); font-size: 12px; margin-right: auto; }
+  .meta { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+  .meta > .btn { flex: none; }
+  .date { color: var(--muted); font-size: 12px; margin-right: auto; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card.editing .meta { flex-wrap: wrap; }
   .badge {
+    flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border: 0; border-radius: 999px; padding: 1px 9px; font-size: 12px;
     background: color-mix(in srgb, var(--c) 20%, transparent);
     color: color-mix(in srgb, var(--c) 65%, var(--text));
@@ -86,7 +95,7 @@
     border: 1px solid var(--border); border-radius: 8px; background: transparent; font-size: 13px;
   }
   .btn.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-  .btn.primary:disabled { opacity: .45; cursor: default; }
+  .btn.primary:disabled, .btn:disabled { opacity: .45; cursor: default; }
   .btn.ghost { padding: 6px 7px; color: var(--muted); border-color: transparent; }
   .btn.done { background: #16a34a; color: #fff; border-color: transparent; }
   @media (hover: hover) {
@@ -109,7 +118,7 @@
   /* --- добавление --- */
   footer {
     flex: none; border-top: 1px solid var(--border); background: var(--bg);
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    padding: 8px 12px calc(8px + max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px)));
   }
   .composer { max-width: 860px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
   .composer textarea {
@@ -149,6 +158,8 @@
   .swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface); outline: 1px solid var(--border); padding: 0; }
   .dlg-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
   .note { color: var(--muted); font-size: 12px; }
+  .meter { height: 6px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: 6px; }
+  .meter > i { display: block; height: 100%; background: var(--accent); width: 0; }
   input[type=range] { accent-color: var(--accent); width: 130px; }
   .tlist { display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
   .trow { display: flex; align-items: center; gap: 8px; }
@@ -162,7 +173,7 @@
   .tlist .empty { padding: 12px; }
 
   /* --- загрузка и уведомления --- */
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--muted); z-index: 30; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); color: var(--muted); z-index: 30; padding: 24px; text-align: center; }
   #toast {
     position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(10px);
     background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 999px; font-size: 13px;
@@ -180,6 +191,7 @@
     <div class="top">
       <h1>База инвайтов</h1>
       <span class="count" id="count"></span>
+      <span class="sync" id="sync"></span>
       <button class="icon-btn" id="themeToggle" title="Тёмная / светлая тема">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       </button>
@@ -229,17 +241,26 @@
   <div class="row"><span>Фон</span><input type="color" data-key="bg"></div>
   <div class="row"><span>Карточки</span><input type="color" data-key="surface"></div>
   <div class="row"><span>Текст</span><input type="color" data-key="text"></div>
+  <div class="row" id="winRow"><span>Окно при открытии<br><span class="note">«Авто»: на ПК — весь экран, на телефоне — обычно</span></span>
+    <div class="seg" id="winSeg"><button data-win="auto">Авто</button><button data-win="normal">Обычное</button><button data-win="full">Весь экран</button></div>
+  </div>
   <div class="row"><span>Размер текста</span>
     <span style="display:flex;gap:8px;align-items:center"><input type="range" id="fs" min="12" max="22" step="1"><span id="fsVal"></span></span>
   </div>
-  <div class="row"><span>Импорт базы<br><span class="note">из программы на ПК (.json)</span></span>
+  <div class="row"><span>Импорт базы<br><span class="note">из программы на ПК или резервной копии (.json)</span></span>
     <button class="btn" id="importBtn">Выбрать файл…</button>
     <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
   </div>
   <div class="row"><span>Резервная копия<br><span class="note">копирует всю базу как текст .json</span></span>
     <button class="btn" id="backupBtn">Скопировать</button>
   </div>
-  <div class="row"><span class="note" id="usage"></span></div>
+  <div class="row" style="display:block">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <span class="note" id="usage"></span>
+      <button class="btn" id="compactBtn" title="Пересобрать хранилище плотнее">Уплотнить</button>
+    </div>
+    <div class="meter"><i id="meter"></i></div>
+  </div>
   <div class="dlg-foot">
     <button class="btn" id="resetColors">Сбросить цвета</button>
     <button class="btn primary" data-close>Готово</button>
@@ -271,6 +292,8 @@ const ICON = {
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   del:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>',
+  expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  shrink: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
 };
 
@@ -288,12 +311,12 @@ const askConfirm = msg => new Promise(res => {
   else res(confirm(msg));
 });
 
-/* ================= Хранилище =================
-   Внутри Telegram — облако Telegram (CloudStorage): данные привязаны к вашему аккаунту
-   и этому боту, синхронизируются между устройствами, другие пользователи их не видят.
-   Лимиты Telegram: до 1024 ключей, до 4096 символов в каждом. Поэтому инвайты упакованы
-   «пачками» по ~4000 символов (ключи i0, i1, …), темы — в ключе topics, вид — в settings.
-   Вне Telegram (просто открыли в браузере) — localStorage, для проверки. */
+/* ================= Облачное хранилище =================
+   Внутри Telegram — CloudStorage: привязано к вашему аккаунту и этому боту, синхронизируется
+   между устройствами, другие пользователи его не видят. Лимиты Telegram: 1024 ключа × 4096 символов.
+   Чтобы влезло как можно больше, инвайты сжимаются (deflate) и хранятся пачками в виде base64 —
+   только латиница, поэтому лимит одинаков, считает Telegram символы или байты.
+   Вне Telegram (открыли в браузере) — localStorage этого браузера, для проверки. */
 const cbP = (res, rej) => (err, val) => err ? rej(new Error(String(err))) : res(val);
 const KV = ver('6.9') ? {
   cloud: true,
@@ -311,85 +334,260 @@ const KV = ver('6.9') ? {
     cloud: false,
     keys: async () => { const o = []; for (let i = 0; i < ls.length; i++) { const k = ls.key(i); if (k && k.startsWith(P)) o.push(k.slice(P.length)); } return o; },
     get: async keys => Object.fromEntries(keys.map(k => [k, ls.getItem(P + k) ?? ''])),
-    set: async (k, v) => { if (v.length > 4096) throw new Error('value too long'); ls.setItem(P + k, v); return true; },
+    set: async (k, v) => { if (new TextEncoder().encode(v).length > 4096) throw new Error('value too long'); ls.setItem(P + k, v); return true; },
     del: async keys => { keys.forEach(k => ls.removeItem(P + k)); return true; },
   };
 })();
 
-const LIMIT = 4000, MAX_CHUNKS = 1000;
-const chunks = new Map();   // ключ -> массив инвайтов
-const clen = new Map();     // ключ -> длина в символах
+async function kvGetMany(keys) {                 // параллельно, по 40 ключей, 4 запроса одновременно
+  const out = {}, batches = [];
+  for (let i = 0; i < keys.length; i += 40) batches.push(keys.slice(i, i + 40));
+  let next = 0;
+  const worker = async () => { while (next < batches.length) Object.assign(out, await KV.get(batches[next++])); };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return out;
+}
+async function kvDelMany(keys) { for (let i = 0; i < keys.length; i += 100) await KV.del(keys.slice(i, i + 100)); }
+
+/* --- сжатие --- */
+const HAS_ZIP = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+const te = new TextEncoder();
+const bytesLen = s => te.encode(s).length;
+function toB64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+function fromB64(s) { const b = atob(s), out = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; }
+async function zip(str) { return new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer()); }
+async function unzip(bytes) { return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'))).text(); }
+async function encodeValue(obj) { const json = JSON.stringify(obj); return HAS_ZIP ? 'z' + toB64(await zip(json)) : json; }
+async function decodeValue(v) {
+  if (!v) return null;
+  if (v[0] === 'z') { if (!HAS_ZIP) throw new Error('no-unzip'); return JSON.parse(await unzip(fromB64(v.slice(1)))); }
+  return JSON.parse(v);                                  // старый несжатый формат
+}
+let unreadable = 0;
+async function safeDecode(v) { try { return await decodeValue(v); } catch (e) { unreadable++; console.error(e); return null; } }
+
+const LIMIT = 4090, MAX_CHUNKS = 1000;
+const CHUNK_RE = /^(i\d+|c[a-z0-9]{4,})$/;
+const uid = (n = 10) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+const pack = it => it.updated && it.updated !== it.created ? [it.id, it.text, it.topic || 0, it.created, it.updated] : [it.id, it.text, it.topic || 0, it.created];
+const unpack = r => Array.isArray(r) && r[0] && typeof r[1] === 'string'
+  ? { id: String(r[0]), text: r[1], topic: r[2] || null, created: +r[3] || 0, updated: +(r[4] ?? r[3]) || 0 } : null;
+const MAX_TEXT = 3500;
+
+/* --- состояние в памяти --- */
+let invites = [];                 // все инвайты, новые сверху
+let topics = [];                  // [{id, name, color}]
+const itemById = new Map();
+const chunkItems = new Map();     // ключ пачки -> её инвайты
+const chunkCost = new Map();      // ключ пачки -> размер в облаке
+let rawValues = {};               // ключ -> строка ровно как в облаке (для кэша и сверки)
+let cloudVer = null;              // метка версии: меняется при каждой записи
+let foreignChange = false;        // во время записи заметили изменения с другого устройства
 let lastKey = null;
-const pack = it => [it.id, it.text, it.topic || null, it.created, it.updated];
-const serialize = arr => JSON.stringify(arr.map(pack));
-const recalc = k => clen.set(k, serialize(chunks.get(k) || []).length);
-const uid = (n = 12) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
-const safeParse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
-const MAX_TEXT = LIMIT - 120;
+const resort = () => { invites = [...itemById.values()].sort((a, b) => b.created - a.created || (a.id < b.id ? 1 : -1)); };
 
-let chain = Promise.resolve();            // записи строго по очереди
-const serial = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
-
-function placeItem(it) {
-  const need = JSON.stringify(pack(it)).length + 1;
-  if (need + 2 > LIMIT) throw new Error('too-long');
-  if (lastKey && chunks.has(lastKey) && clen.get(lastKey) + need <= LIMIT) return lastKey;
-  for (const [k, l] of clen) if (l + need <= LIMIT) return (lastKey = k);
-  for (let n = 0; n < MAX_CHUNKS; n++) {
-    const k = 'i' + n;
-    if (!chunks.has(k)) { chunks.set(k, []); clen.set(k, 2); return (lastKey = k); }
-  }
-  throw new Error('full');
-}
-function attach(it) { const k = placeItem(it); chunks.get(k).push(it); it._c = k; recalc(k); return k; }
-function detach(it) { const arr = chunks.get(it._c); if (arr) { arr.splice(arr.indexOf(it), 1); recalc(it._c); } }
-
-async function writeChunk(k) {
-  const arr = chunks.get(k);
-  if (!arr || !arr.length) { chunks.delete(k); clen.delete(k); await KV.del([k]); return; }
-  const s = serialize(arr); clen.set(k, s.length); await KV.set(k, s);
+function reconcile(k, rows) {     // привести память к тому, что теперь лежит в пачке k
+  for (const o of chunkItems.get(k) || []) if (itemById.get(o.id) === o && !rows.some(n => n.id === o.id)) itemById.delete(o.id);
+  const list = rows.map(n => {
+    const ex = itemById.get(n.id);
+    if (ex) { Object.assign(ex, { text: n.text, topic: n.topic, created: n.created, updated: n.updated }); ex._c = k; return prep(ex); }
+    const it = prep({ ...n, _c: k }); itemById.set(it.id, it); return it;
+  });
+  if (list.length) chunkItems.set(k, list); else chunkItems.delete(k);
 }
 
-async function loadAll() {
-  const keys = await KV.keys();
-  const want = keys.filter(k => /^i\d+$/.test(k) || k === 'topics' || k === 'settings');
-  const vals = {};
-  for (let i = 0; i < want.length; i += 50) Object.assign(vals, await KV.get(want.slice(i, i + 50)));
-  topics = safeParse(vals.topics, []).filter(t => t && t.id && t.name);
+async function applyValues(values) {
+  unreadable = 0;
+  const tps = await safeDecode(values.topics);
+  const st = await safeDecode(values.settings);
+  const keys = Object.keys(values).filter(k => CHUNK_RE.test(k) && values[k]);
+  const decoded = await Promise.all(keys.map(async k => [k, (await safeDecode(values[k])) || []]));
+  topics = (Array.isArray(tps) ? tps : []).filter(t => t && t.id && t.name);
   const tset = new Set(topics.map(t => t.id));
-  chunks.clear(); clen.clear(); lastKey = null;
-  const seen = new Map();
-  for (const k of want.filter(k => k[0] === 'i').sort((a, b) => a.slice(1) - b.slice(1))) {
-    const keep = [];
-    for (const a of safeParse(vals[k], [])) {
-      if (!Array.isArray(a) || !a[0] || typeof a[1] !== 'string' || seen.has(a[0])) continue;
-      const it = { id: a[0], text: a[1], topic: tset.has(a[2]) ? a[2] : null, created: +a[3] || 0, updated: +a[4] || +a[3] || 0, _c: k };
-      seen.set(it.id, it); keep.push(it);
+  itemById.clear(); chunkItems.clear(); chunkCost.clear(); rawValues = {};
+  for (const k of ['topics', 'settings']) if (values[k]) rawValues[k] = values[k];
+  for (const [k, rows] of decoded) {
+    rawValues[k] = values[k]; chunkCost.set(k, bytesLen(values[k]));
+    const list = [];
+    for (const r of rows) {
+      const it = unpack(r); if (!it) continue;
+      if (it.topic && !tset.has(it.topic)) it.topic = null;
+      const prev = itemById.get(it.id);
+      if (prev) { if (prev.updated >= it.updated) continue; chunkItems.set(prev._c, (chunkItems.get(prev._c) || []).filter(x => x !== prev)); }
+      it._c = k; itemById.set(it.id, prep(it)); list.push(it);
     }
-    chunks.set(k, keep); recalc(k);
+    chunkItems.set(k, list);
   }
-  invites = [...seen.values()].map(prep).sort((a, b) => b.created - a.created);
-  return safeParse(vals.settings, null);
+  resort();
+  if (st && typeof st === 'object') settings = { ...settings, ...st, colors: { tg: {}, dark: {}, light: {}, ...(st.colors || {}) } };
+  return keys.filter(k => values[k][0] !== 'z').length;   // сколько пачек в старом формате
+}
+
+/* --- кэш на устройстве: приложение открывается мгновенно, облако сверяется в фоне --- */
+const CACHE_KEY = 'db:' + (IN_TG ? (tg.initDataUnsafe?.user?.id || 'tg') : 'local');
+const idb = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open('invite-vault', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  return {
+    async get(k) { try { const db = await open(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); } catch (e) { return undefined; } },
+    async set(k, v) { try { const db = await open(); await new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) {} },
+  };
+})();
+let cacheTimer;
+const saveCacheSoon = () => { clearTimeout(cacheTimer); cacheTimer = setTimeout(() => idb.set(CACHE_KEY, { ver: cloudVer, values: rawValues }), 400); };
+
+/* --- очередь записей + индикатор --- */
+let chain = Promise.resolve(), pending = 0;
+function setSync(state) {
+  const el = $('#sync');
+  el.classList.toggle('err', state === 'error');
+  el.textContent = state === 'saving' ? 'сохранение…' : state === 'error' ? '⚠ нет связи' : state === 'synced' ? '✓' : '';
+  if (state === 'synced') setTimeout(() => { if (!pending && el.textContent === '✓') el.textContent = ''; }, 1500);
+}
+const serial = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
+function op(fn) {                                  // запись в облако: по очереди, с версией и кэшем
+  pending++; setSync('saving');
+  return serial(async () => {
+    try {
+      const r = await fn();
+      cloudVer = Date.now().toString(36) + uid(3);
+      await KV.set('ver', cloudVer);
+      saveCacheSoon();
+      return r;
+    } finally {
+      pending--;
+      if (foreignChange) { foreignChange = false; refreshAll(true); }
+    }
+  }).then(r => { if (!pending) setSync('synced'); return r; }, e => { setSync('error'); throw e; });
+}
+
+/* Изменить пачку: сначала читаем её свежую версию из облака (вдруг правили с телефона), потом пишем. */
+async function mutateChunk(k, fn) {
+  const v = (await KV.get([k]))[k] || '';
+  if (v !== (rawValues[k] || '')) foreignChange = true;
+  const fresh = v ? ((await decodeValue(v)) || []).map(unpack).filter(Boolean) : [];
+  const next = fn(fresh);
+  if (!next.length) {
+    if (v) await KV.del([k]);
+    delete rawValues[k]; chunkCost.delete(k); reconcile(k, []); return true;
+  }
+  const enc = await encodeValue(next.map(pack));
+  if (bytesLen(enc) > LIMIT) return false;
+  await KV.set(k, enc);
+  rawValues[k] = enc; chunkCost.set(k, bytesLen(enc)); reconcile(k, next);
+  return true;
+}
+function newChunkKey() {
+  if (chunkItems.size >= MAX_CHUNKS) throw new Error('full');
+  let k; do k = 'c' + uid(7); while (rawValues[k]); return k;
+}
+async function placeItem(item) {                  // положить инвайт в пачку, где есть место
+  const tried = new Set();
+  const cands = [lastKey, ...[...chunkCost.entries()].sort((a, b) => a[1] - b[1]).map(e => e[0])]
+    .filter(k => k && chunkCost.has(k) && chunkCost.get(k) < LIMIT - 200);
+  for (const k of cands) {
+    if (tried.has(k)) continue; tried.add(k);
+    if (await mutateChunk(k, arr => [...arr.filter(x => x.id !== item.id), item])) { lastKey = k; return k; }
+    if (tried.size >= 3) break;
+  }
+  const k = newChunkKey();
+  if (!(await mutateChunk(k, () => [item]))) throw new Error('too-long');
+  lastKey = k; return k;
+}
+async function mutateTopics(fn) {
+  const v = (await KV.get(['topics'])).topics || '';
+  if (v !== (rawValues.topics || '')) foreignChange = true;
+  const fresh = ((await decodeValue(v)) || []).filter(t => t && t.id && t.name);
+  const next = fn(fresh);
+  const enc = await encodeValue(next);
+  if (bytesLen(enc) > LIMIT) throw new Error('topics-full');
+  await KV.set('topics', enc);
+  rawValues.topics = enc; topics = next;
+}
+
+/* Упаковать много инвайтов в новые пачки (импорт, уплотнение). */
+async function packIntoChunks(items, tooLong) {
+  const out = [];
+  let cur = [], raw = 0, room = LIMIT, sinceCheck = 0, ratio = 0.45, lastEnc = null;
+  const flush = async () => {
+    if (!cur.length) return;
+    const enc = lastEnc && lastEnc.n === cur.length ? lastEnc.v : await encodeValue(cur.map(pack));
+    out.push({ k: newKeyFor(out), items: cur, enc });
+    cur = []; raw = 0; room = LIMIT; sinceCheck = 0; lastEnc = null;
+  };
+  for (let i = 0; i < items.length;) {
+    const it = items[i], r = bytesLen(JSON.stringify(pack(it))) + 1;
+    cur.push(it); raw += r; sinceCheck += r;
+    if (sinceCheck * ratio > room * 0.8) {
+      const enc = await encodeValue(cur.map(pack)), c = bytesLen(enc);
+      if (c > LIMIT) {
+        cur.pop(); raw -= r;
+        if (!cur.length) { tooLong.push(it); i++; continue; }
+        await flush(); continue;                      // этот же инвайт — в новую пачку
+      }
+      ratio = Math.max(0.05, c / raw); room = LIMIT - c; sinceCheck = 0; lastEnc = { n: cur.length, v: enc };
+    }
+    i++;
+  }
+  await flush();
+  return out;
+}
+function newKeyFor(out) { let k; do k = 'c' + uid(7); while (rawValues[k] || out.some(o => o.k === k)); return k; }
+async function writePacked(packed, label) {
+  let n = 0, next = 0;
+  const worker = async () => {
+    while (next < packed.length) {
+      const p = packed[next++];
+      await KV.set(p.k, p.enc);
+      rawValues[p.k] = p.enc; chunkCost.set(p.k, bytesLen(p.enc)); reconcile(p.k, p.items.map(x => ({ ...x })));
+      if (label) toast(`${label}… ${Math.round(++n / packed.length * 100)}%`);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+}
+
+/* Загрузка из облака. Если версия не менялась — используем копию на устройстве. */
+async function syncFromCloud(force) {
+  const keys = await KV.keys();
+  const wanted = keys.filter(k => CHUNK_RE.test(k) || k === 'topics' || k === 'settings');
+  const v = keys.includes('ver') ? ((await KV.get(['ver'])).ver || null) : null;
+  const same = !force && v && v === cloudVer && wanted.length === Object.keys(rawValues).length && wanted.every(k => k in rawValues);
+  if (same) return { changed: false, legacy: 0 };
+  const values = await kvGetMany(wanted);
+  const legacy = await applyValues(values);
+  cloudVer = v;
+  saveCacheSoon();
+  return { changed: true, legacy };
 }
 
 async function failed(e) {
   console.error(e);
   const m = String(e && e.message);
-  toast(m === 'full' ? 'Облако Telegram заполнено (≈4 МБ)' : m === 'too-long' ? `Слишком длинный текст (макс. ${MAX_TEXT} символов)` : 'Не удалось сохранить — проверьте интернет');
+  toast(m === 'full' ? 'Облако Telegram заполнено — нажмите «Уплотнить» в настройках'
+      : m === 'too-long' ? `Слишком длинный текст (макс. ${MAX_TEXT} символов)`
+      : m === 'topics-full' ? 'Слишком много тем'
+      : 'Не удалось сохранить — проверьте интернет');
   haptic('error');
-  try { await loadAll(); refreshAll(); } catch (e2) {}
+  try { await serial(() => syncFromCloud(true)); refreshAll(true); } catch (e2) {}
 }
 
-const saveTopics = () => {
-  const s = JSON.stringify(topics);
-  if (s.length > 4096) throw new Error('topics-full');
-  return KV.set('topics', s);
-};
-
-function usage() {
-  let used = 0; for (const l of clen.values()) used += l;
-  const pct = Math.max(used ? 1 : 0, Math.round(used / (MAX_CHUNKS * LIMIT) * 100));
-  return `${KV.cloud ? 'Хранится в облаке Telegram' : 'Открыто вне Telegram — данные только в этом браузере'} · занято ${pct}% (${invites.length} инвайтов)`;
+function usageInfo() {
+  let used = 0; for (const l of chunkCost.values()) used += l;
+  const cap = MAX_CHUNKS * LIMIT;
+  const per = invites.length > 20 ? used / invites.length : 120;
+  return { used, cap, pct: used / cap, left: Math.max(0, Math.floor((cap - used) / per)) };
+}
+function renderUsage() {
+  const u = usageInfo();
+  const where = KV.cloud ? 'Облако Telegram' : 'Открыто вне Telegram — данные только в этом браузере';
+  const fmt = n => n.toLocaleString('ru-RU');
+  $('#usage').textContent = `${where} · ${fmt(invites.length)} инвайтов · занято ${Math.max(u.used ? 1 : 0, Math.round(u.pct * 100))}% · влезет ещё ≈ ${fmt(u.left)}`
+    + (HAS_ZIP ? '' : ' · сжатие недоступно на этом устройстве');
+  $('#meter').style.width = Math.min(100, u.pct * 100).toFixed(1) + '%';
 }
 
 /* ================= Оформление ================= */
@@ -435,7 +633,7 @@ function applyTheme() {
 let saveTimer;
 function saveSettings() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => serial(() => KV.set('settings', JSON.stringify(settings))).catch(() => {}), 600);
+  saveTimer = setTimeout(() => op(async () => { const enc = await encodeValue(settings); await KV.set('settings', enc); rawValues.settings = enc; }).catch(() => {}), 700);
 }
 function syncSettingsUI() {
   const p = palette();
@@ -466,32 +664,29 @@ document.querySelectorAll('dialog').forEach(d => {
     if (outside || e.target.closest('[data-close]')) d.close();
   });
 });
-const openSettings = () => { $('#usage').textContent = usage(); openDialog($('#settings')); };
+const openSettings = () => { renderUsage(); syncWinUI(); openDialog($('#settings')); };
 $('#openSettings').onclick = openSettings;
 if (ver('7.0')) { tg.SettingsButton.show(); tg.SettingsButton.onClick(openSettings); }
 
-/* ================= Данные ================= */
-let invites = [];      // новые сверху
-let topics = [];       // [{id, name, color}]
-const store = {
+/* ================= Данные и поиск ================= */
+const local = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
-let active = store.get('iv-topic', 'all');
+let active = local.get('iv-topic', 'all');
 let terms = [], matched = [], filtered = [], shown = 0;
 const PAGE = 100;
 
 const norm = s => s.toLowerCase().replace(/ё/g, 'е');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function prep(it) { it._n = norm(it.text); return it; }
-const byId = id => invites.find(i => i.id === id);
+const byId = id => itemById.get(id);
 const topicById = id => topics.find(t => t.id === id);
 const topicName = id => id === 'all' ? 'Все' : id === 'none' || !id ? 'Без темы' : (topicById(id)?.name ?? '?');
 const inActive = it => active === 'all' || (active === 'none' ? !it.topic : it.topic === active);
 const matchesTerms = it => terms.every(t => it._n.includes(t));
 const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-/* ================= Темы: чипы и списки ================= */
 function renderChips() {
   const cnt = { all: matched.length, none: 0 };
   topics.forEach(t => cnt[t.id] = 0);
@@ -505,7 +700,8 @@ function renderChips() {
     chip('all', 'Все') + topics.map(t => chip(t.id, t.name, t.color)).join('') +
     (topics.length || cnt.none !== matched.length ? chip('none', 'Без темы') : '') +
     `<button class="chip tool" data-tool="new" title="Новая тема">${ICON.plus}${topics.length ? '' : 'Тема'}</button>` +
-    (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '');
+    (topics.length ? `<button class="chip tool" data-tool="manage" title="Управление темами">${ICON.gear}</button>` : '') +
+    (CAN_FULL ? `<button class="chip tool" data-tool="window" title="${isFull() ? 'Обычное окно' : 'На весь экран'}">${isFull() ? ICON.shrink : ICON.expand}${isFull() ? '' : 'Весь экран'}</button>` : '');
   $('#topics .chip.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 function topicOptions(selected) {
@@ -520,16 +716,46 @@ function renderTopicSelect() {
 }
 function setActive(id) {
   if (id !== 'all' && id !== 'none' && !topicById(id)) id = 'all';
-  active = id; store.set('iv-topic', id);
+  active = id; local.set('iv-topic', id);
   renderTopicSelect(); applyFilter();
 }
 $('#topics').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.topic) return setActive(b.dataset.topic);
+  if (b.dataset.tool === 'window') return toggleFull();
   if (b.dataset.tool) openTopics(b.dataset.tool === 'new');
 });
 
-/* ================= Поиск и лента ================= */
+/* ================= Размер окна =================
+   Telegram даёт мини-приложению только «обычное окно» или «весь экран» (Bot API 8.0+).
+   Выбор запоминается на этом устройстве. «Авто»: компьютер — весь экран, телефон — обычно. */
+const CAN_FULL = ver('8.0');
+const DESKTOP = IN_TG && ['tdesktop', 'macos', 'web', 'weba', 'webk', 'unigram'].includes(tg.platform);
+const isFull = () => CAN_FULL && !!tg.isFullscreen;
+const winPref = () => local.get('iv-window', 'auto');
+function syncWinUI() {
+  document.querySelectorAll('#winSeg button').forEach(b => b.classList.toggle('on', b.dataset.win === winPref()));
+  $('#winRow').style.display = CAN_FULL ? '' : 'none';
+}
+function applyWindowPref() {
+  if (!CAN_FULL) return;
+  const p = winPref(), want = p === 'full' || (p === 'auto' && DESKTOP);
+  try { if (want && !tg.isFullscreen) tg.requestFullscreen(); else if (!want && tg.isFullscreen) tg.exitFullscreen(); } catch (e) {}
+}
+function toggleFull() {
+  const goFull = !isFull();
+  local.set('iv-window', goFull ? 'full' : 'normal');
+  syncWinUI();
+  try { goFull ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) {}
+}
+$('#winSeg').onclick = e => { const w = e.target.dataset.win; if (!w) return; local.set('iv-window', w); syncWinUI(); applyWindowPref(); };
+if (CAN_FULL) {
+  tg.onEvent('fullscreenChanged', () => renderChips());
+  tg.onEvent('fullscreenFailed', ev => {
+    if (ev && ev.error === 'UNSUPPORTED') toast('Этот Telegram не умеет открывать приложения на весь экран — обновите его');
+  });
+}
+
 function highlight(text, n) {
   if (!terms.length || n.length !== text.length) return esc(text);
   const ranges = [];
@@ -560,7 +786,7 @@ function cardHTML(it) {
 }
 function updateCount() {
   const total = active === 'all' ? invites.length : invites.filter(inActive).length;
-  $('#count').textContent = terms.length ? `найдено ${filtered.length} из ${total}` : `${total} шт.`;
+  $('#count').textContent = terms.length ? `найдено ${filtered.length} из ${total}` : `${total.toLocaleString('ru-RU')} шт.`;
   $('#scope').textContent = active === 'all' ? '' : `в «${topicName(active)}»`;
   $('#q').placeholder = active === 'all' ? 'Поиск по всем темам…' : 'Поиск внутри темы…';
 }
@@ -573,28 +799,33 @@ function emptyHTML(q) {
   if (!invites.length) return '<div class="empty">База пуста. Добавьте первый инвайт внизу<br>или импортируйте базу с ПК (кнопка с палитрой).</div>';
   return `<div class="empty">В теме «${esc(topicName(active))}» пока нет инвайтов.<br>Новый инвайт, добавленный сейчас, попадёт сюда.</div>`;
 }
-function applyFilter() {
+function applyFilter(keepScroll) {
   const q = $('#q').value;
+  const scroll = keepScroll ? $('#scroller').scrollTop : 0;
+  const want = keepScroll ? Math.max(shown, PAGE) : PAGE;
   $('#searchBox').classList.toggle('has-q', q.length > 0);
   terms = norm(q).split(/\s+/).filter(Boolean);
   matched = terms.length ? invites.filter(matchesTerms) : invites;
   filtered = matched.filter(inActive);
   shown = 0;
-  $('#scroller').scrollTop = 0;
   $('#list').innerHTML = filtered.length ? '' : emptyHTML(q.trim());
-  renderMore(); renderChips(); updateCount();
+  renderMore(want); renderChips(); updateCount();
+  $('#scroller').scrollTop = scroll;
 }
 const refreshCounts = () => { renderChips(); updateCount(); };
-function refreshAll() { renderTopicSelect(); applyFilter(); }
-function renderMore() {
+function refreshAll(keepScroll) {
+  if (document.querySelector('.card.editing')) { refreshCounts(); return; }   // не сбивать открытую правку
+  renderTopicSelect(); applyFilter(keepScroll);
+}
+function renderMore(n = PAGE) {
   if (shown >= filtered.length) return;
-  const chunk = filtered.slice(shown, shown + PAGE);
+  const chunk = filtered.slice(shown, shown + n);
   $('#list').insertAdjacentHTML('beforeend', chunk.map(cardHTML).join(''));
   shown += chunk.length;
 }
 new IntersectionObserver(es => { if (es[0].isIntersecting) renderMore(); }, { root: $('#scroller'), rootMargin: '600px' }).observe($('#sentinel'));
 
-$('#q').addEventListener('input', applyFilter);
+$('#q').addEventListener('input', () => applyFilter());
 $('#q').addEventListener('keydown', e => {
   if (e.key === 'Escape') { $('#q').value = ''; applyFilter(); }
   if (e.key === 'Enter') { e.preventDefault(); $('#q').blur(); }   // на телефоне — спрятать клавиатуру
@@ -621,11 +852,11 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
 }
 
-/* ================= Действия с карточками ================= */
+/* ================= Действия с карточками (сразу на экране, сохранение — в фоне) ================= */
 function dropFromView(it, card) {
   filtered = filtered.filter(i => i !== it);
   shown = Math.max(0, shown - 1);
-  card.remove();
+  card?.remove();
   if (!filtered.length) $('#list').innerHTML = emptyHTML($('#q').value.trim());
 }
 $('#list').addEventListener('click', async e => {
@@ -648,12 +879,11 @@ $('#list').addEventListener('click', async e => {
   if (act === 'goto') setActive(it.topic);
   if (act === 'del') {
     if (!await askConfirm('Удалить этот инвайт?\n\n' + it.text.slice(0, 150))) return;
-    try {
-      await serial(async () => { const k = it._c; detach(it); await writeChunk(k); });
-    } catch (err) { return failed(err); }
-    invites = invites.filter(i => i !== it);
+    const k = it._c;
+    itemById.delete(it.id); resort();
     matched = terms.length ? matched.filter(i => i !== it) : invites;
     dropFromView(it, card); refreshCounts(); toast('Удалено');
+    op(() => mutateChunk(k, arr => arr.filter(x => x.id !== it.id))).catch(failed);
   }
   if (act === 'edit') startEdit(card, it);
   if (act === 'save') saveEdit(card, it);
@@ -676,21 +906,15 @@ function startEdit(card, it) {
     if (e.key === 'Escape') { e.preventDefault(); card.outerHTML = cardHTML(it); }
   };
 }
-async function saveEdit(card, it) {
+function saveEdit(card, it) {
   const text = card.querySelector('textarea').value.trim();
   const topic = card.querySelector('select').value || null;
   if (!text) return toast('Текст пустой — для удаления используйте корзину');
   if (invites.some(i => i !== it && i.text === text)) return toast('Точно такой же инвайт уже есть в базе');
   const moved = it.topic !== topic;
-  try {
-    await serial(async () => {
-      Object.assign(it, { text, topic, updated: Date.now() }); prep(it);
-      const k = it._c; recalc(k);
-      if (clen.get(k) <= LIMIT) return writeChunk(k);
-      detach(it); const nk = attach(it);              // не влезает — переносим в другую пачку
-      await writeChunk(nk); await writeChunk(k);
-    });
-  } catch (err) { return failed(err); }
+  const patch = { text, topic, updated: Date.now() };
+  Object.assign(it, patch); prep(it);
+  card.classList.remove('editing');
   if (terms.length && !matchesTerms(it)) matched = matched.filter(i => i !== it);
   if (!inActive(it) || (terms.length && !matchesTerms(it))) {
     dropFromView(it, card);
@@ -700,6 +924,17 @@ async function saveEdit(card, it) {
     toast(moved ? `Тема: «${topicName(it.topic)}»` : 'Сохранено');
   }
   refreshCounts();
+  const k = it._c;
+  op(async () => {
+    const ok = await mutateChunk(k, arr => arr.some(x => x.id === it.id)
+      ? arr.map(x => x.id === it.id ? { ...x, ...patch } : x)
+      : [...arr, { ...it }]);                          // удалили на другом устройстве — вернём
+    if (!ok) {                                          // не влезает в свою пачку — переносим
+      await mutateChunk(k, arr => arr.filter(x => x.id !== it.id));
+      itemById.set(it.id, it);
+      await placeItem(it);
+    }
+  }).catch(failed);
 }
 
 /* ================= Добавление ================= */
@@ -721,22 +956,18 @@ newText.addEventListener('keydown', e => { if (isSubmitKey(e)) { e.preventDefaul
 $('#addBtn').addEventListener('pointerdown', e => e.preventDefault());   // не прятать клавиатуру на телефоне
 $('#addBtn').onclick = add;
 
-let adding = false;
-async function add() {
-  const text = newText.value.trim(); if (!text || adding) return;
+function add() {
+  const text = newText.value.trim(); if (!text) return;
   const dup = invites.find(i => i.text === text);
   if (dup) { haptic('warning'); return toast(`Такой инвайт уже есть (тема «${topicName(dup.topic)}»)`); }
   const now = Date.now();
-  const item = prep({ id: uid(), text, topic: $('#newTopic').value || null, created: now, updated: now });
-  adding = true; $('#addBtn').disabled = true;
-  try { await serial(async () => { const k = attach(item); try { await writeChunk(k); } catch (e) { detach(item); throw e; } }); }
-  catch (err) { adding = false; autosize(); return failed(err); }
-  adding = false;
-  invites.unshift(item);
+  const item = prep({ id: uid(10), text, topic: $('#newTopic').value || null, created: now, updated: now });
+  itemById.set(item.id, item); resort();
   newText.value = ''; autosize();
   applyFilter(); haptic('success');
   const where = topics.length ? ` в «${topicName(item.topic)}»` : '';
   toast(filtered.includes(item) ? `Добавлено${where}` : `Добавлено${where} — скрыто фильтром`);
+  op(() => placeItem(item)).catch(err => { itemById.delete(item.id); resort(); failed(err); });
 }
 
 /* ================= Управление темами ================= */
@@ -761,22 +992,20 @@ function openTopics(focusNew) {
 async function createTopic() {
   const name = $('#tnewName').value.trim().slice(0, 60); if (!name) return $('#tnewName').focus();
   if (topics.some(t => t.name.toLowerCase() === name.toLowerCase())) return toast('Тема с таким названием уже есть');
-  const t = { id: uid(10), name, color: $('#tnewColor').value };
-  topics.push(t);
-  try { await serial(saveTopics); }
-  catch (err) { topics = topics.filter(x => x !== t); return toast(String(err.message) === 'topics-full' ? 'Слишком много тем' : 'Не удалось сохранить тему'); }
-  $('#tnewName').value = ''; $('#tnewColor').value = nextColor();
+  const t = { id: uid(8), name, color: $('#tnewColor').value };
+  $('#tnewName').value = '';
+  try { await op(() => mutateTopics(arr => arr.some(x => x.name.toLowerCase() === name.toLowerCase()) ? arr : [...arr, t])); }
+  catch (err) { return failed(err); }
+  $('#tnewColor').value = nextColor();
   renderTopicList(); refreshAll(); toast(`Тема «${name}» создана`);
 }
 $('#tnewAdd').onclick = createTopic;
 $('#tnewName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createTopic(); } });
 
 async function updateTopic(t, patch, input) {
-  const before = { ...t };
-  Object.assign(t, patch);
-  try { await serial(saveTopics); }
-  catch (err) { Object.assign(t, before); if (input) input.value = t.name; return toast('Не удалось сохранить тему'); }
-  refreshAll();
+  try { await op(() => mutateTopics(arr => arr.map(x => x.id === t.id ? { ...x, ...patch } : x))); }
+  catch (err) { if (input) input.value = t.name; return failed(err); }
+  refreshAll(true);
 }
 $('#tlist').addEventListener('input', e => {
   const t = topicById(e.target.closest('.trow')?.dataset.id);
@@ -798,16 +1027,12 @@ $('#tlist').addEventListener('click', async e => {
   const t = topicById(e.target.closest('.trow').dataset.id); if (!t) return;
   const affected = invites.filter(i => i.topic === t.id);
   if (!await askConfirm(`Удалить тему «${t.name}»?` + (affected.length ? `\n\n${affected.length} инвайт(ов) перейдут в «Без темы».` : ''))) return;
-  try {
-    await serial(async () => {
-      topics = topics.filter(x => x !== t);
-      await saveTopics();
-      const dirty = new Set();
-      affected.forEach(i => { i.topic = null; dirty.add(i._c); });
-      for (const k of dirty) { recalc(k); await writeChunk(k); }
-    });
-  } catch (err) { return failed(err); }
-  if (active === t.id) { active = 'all'; store.set('iv-topic', 'all'); }
+  // одна запись: у инвайтов ссылка на удалённую тему просто перестаёт что-то значить —
+  // при загрузке такие инвайты сами попадают в «Без темы» (пачки переписывать не нужно)
+  try { await op(() => mutateTopics(arr => arr.filter(x => x.id !== t.id))); }
+  catch (err) { return failed(err); }
+  affected.forEach(i => { i.topic = null; });
+  if (active === t.id) { active = 'all'; local.set('iv-topic', 'all'); }
   renderTopicList(); refreshAll(); toast(`Тема «${t.name}» удалена`);
 });
 
@@ -818,7 +1043,7 @@ $('#backupBtn').onclick = async () => {
   toast('Копия в буфере — вставьте в текстовый файл и сохраните как .json');
 };
 
-/* ================= Импорт с ПК ================= */
+/* ================= Импорт ================= */
 $('#importBtn').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async e => {
   const files = [...e.target.files]; e.target.value = '';
@@ -831,45 +1056,64 @@ $('#importFile').onchange = async e => {
       else { if (Array.isArray(d.invites)) inv.push(...d.invites); if (Array.isArray(d.topics)) tps.push(...d.topics); }
     }
   } catch (err) { return toast('Не удалось прочитать файл — нужен .json из программы'); }
-
-  const idMap = {}, newTopics = [];
-  for (const t of tps) {
-    if (!t || !t.name) continue;
-    let ex = topics.find(x => x.name.toLowerCase() === String(t.name).toLowerCase());
-    if (!ex) { ex = { id: uid(10), name: String(t.name).slice(0, 60), color: hex(t.color) || nextColor() }; topics.push(ex); newTopics.push(ex); }
-    idMap[t.id] = ex.id;
-  }
-  const texts = new Set(invites.map(i => i.text));
-  const fresh = [];
-  let dupes = 0, tooLong = 0;
-  for (const x of inv) {
-    const text = typeof x?.text === 'string' ? x.text.trim() : '';
-    if (!text) continue;
-    if (texts.has(text)) { dupes++; continue; }
-    if (text.length > MAX_TEXT) { tooLong++; continue; }
-    texts.add(text);
-    const created = +x.created || Date.now();
-    fresh.push(prep({ id: uid(), text, topic: idMap[x.topic] || null, created, updated: +x.updated || created }));
-  }
-  if (!fresh.length && !newTopics.length) return toast(dupes ? 'Всё из файла уже есть в базе' : 'В файле не найдено инвайтов');
-
-  let added = 0;
+  let result;
   try {
-    await serial(async () => {
-      if (newTopics.length) await saveTopics();
-      const dirty = new Set();
-      for (const it of fresh) { dirty.add(attach(it)); }
-      let n = 0;
-      for (const k of dirty) { toast(`Импорт… ${Math.round(++n / dirty.size * 100)}%`); await writeChunk(k); }
-      added = fresh.length;
+    result = await op(async () => {
+      await syncFromCloud(true);                         // работаем от свежего состояния облака
+      const idMap = {}, newTopics = [];
+      for (const t of tps) {
+        if (!t || !t.name) continue;
+        let ex = topics.find(x => x.name.toLowerCase() === String(t.name).toLowerCase())
+              || newTopics.find(x => x.name.toLowerCase() === String(t.name).toLowerCase());
+        if (!ex) { ex = { id: uid(8), name: String(t.name).slice(0, 60), color: hex(t.color) || ACCENTS[(topics.length + newTopics.length) % ACCENTS.length] }; newTopics.push(ex); }
+        idMap[t.id] = ex.id;
+      }
+      if (newTopics.length) await mutateTopics(arr => [...arr, ...newTopics.filter(n => !arr.some(x => x.name.toLowerCase() === n.name.toLowerCase()))]);
+      const texts = new Set(invites.map(i => i.text));
+      const fresh = []; let dupes = 0;
+      for (const x of inv) {
+        const text = typeof x?.text === 'string' ? x.text.trim() : '';
+        if (!text) continue;
+        if (texts.has(text)) { dupes++; continue; }
+        texts.add(text);
+        const created = +x.created || Date.now();
+        fresh.push({ id: uid(10), text, topic: idMap[x.topic] || null, created, updated: +x.updated || created });
+      }
+      const tooLong = [];
+      const packed = await packIntoChunks(fresh, tooLong);
+      if (chunkItems.size + packed.length > MAX_CHUNKS) throw new Error('full');
+      await writePacked(packed, 'Импорт');
+      resort();
+      return { added: fresh.length - tooLong.length, topicsAdded: newTopics.length, dupes, tooLong: tooLong.length };
     });
   } catch (err) { return failed(err); }
-  invites.push(...fresh);
-  invites.sort((a, b) => b.created - a.created);
-  $('#usage').textContent = usage();
-  refreshAll(); haptic('success');
-  toast(`Импортировано: ${added}` + (newTopics.length ? `, тем: ${newTopics.length}` : '') +
-        (dupes ? ` · уже были: ${dupes}` : '') + (tooLong ? ` · слишком длинных: ${tooLong}` : ''));
+  renderUsage(); refreshAll(); haptic('success');
+  if (!result.added && !result.topicsAdded) return toast(result.dupes ? 'Всё из файла уже есть в базе' : 'В файле не найдено инвайтов');
+  toast(`Импортировано: ${result.added}` + (result.topicsAdded ? `, тем: ${result.topicsAdded}` : '') +
+        (result.dupes ? ` · уже были: ${result.dupes}` : '') + (result.tooLong ? ` · слишком длинных: ${result.tooLong}` : ''));
+};
+
+/* ================= Уплотнение хранилища ================= */
+async function compactAll(silent) {
+  return op(async () => {
+    await syncFromCloud(true);
+    const all = [...itemById.values()].sort((a, b) => a.created - b.created).map(x => ({ id: x.id, text: x.text, topic: x.topic, created: x.created, updated: x.updated }));
+    const oldKeys = [...chunkItems.keys()];
+    const packed = await packIntoChunks(all, []);
+    if (packed.length >= oldKeys.length && oldKeys.every(k => rawValues[k]?.[0] === 'z')) return false;   // и так плотно
+    await writePacked(packed, silent ? null : 'Уплотнение');   // сначала новые пачки…
+    for (const k of oldKeys) { chunkItems.delete(k); chunkCost.delete(k); delete rawValues[k]; }
+    await kvDelMany(oldKeys);                                    // …потом удаляем старые
+    for (const p of packed) reconcile(p.k, p.items);
+    resort();
+    return true;
+  });
+}
+$('#compactBtn').onclick = async () => {
+  $('#compactBtn').disabled = true;
+  try { const changed = await compactAll(false); renderUsage(); refreshAll(true); toast(changed ? 'Хранилище уплотнено' : 'Уже уплотнено'); }
+  catch (err) { failed(err); }
+  finally { $('#compactBtn').disabled = false; }
 };
 
 /* ================= Горячие клавиши (ПК) ================= */
@@ -885,21 +1129,49 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* ================= Синхронизация при возврате в приложение ================= */
+let lastSync = 0;
+async function backgroundSync() {
+  if (Date.now() - lastSync < 3000 || pending) return;
+  lastSync = Date.now();
+  try {
+    const r = await serial(() => syncFromCloud(false));
+    if (r.changed) { applyTheme(); refreshAll(true); }
+    if (!pending) setSync('');
+  } catch (e) { setSync('error'); }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) backgroundSync(); });
+if (ver('8.0')) tg.onEvent('activated', backgroundSync);
+
 /* ================= Старт ================= */
 (async () => {
   applyTheme();
+  syncWinUI(); applyWindowPref();                    // ПК — сразу на весь экран (если так выбрано)
+  const cached = await idb.get(CACHE_KEY);
+  let shownFromCache = false;
+  if (cached && cached.values) {
+    try {
+      await applyValues(cached.values); cloudVer = cached.ver || null;
+      applyTheme(); setActive(active); $('#loading').remove(); shownFromCache = true;
+    } catch (e) { console.error(e); }
+  }
+  let legacy = 0;
   try {
-    const s = await loadAll();
-    if (s) settings = { ...settings, ...s, colors: { tg: {}, dark: {}, light: {}, ...(s.colors || {}) } };
+    setSync('saving');
+    const r = await serial(() => syncFromCloud(!shownFromCache));
+    legacy = r.legacy;
+    if (r.changed || !shownFromCache) { applyTheme(); refreshAll(shownFromCache); }
+    setSync('');
   } catch (err) {
     console.error(err);
-    $('#loading').textContent = 'Не удалось загрузить базу из облака Telegram. Проверьте интернет и откройте приложение заново.';
-    return;
+    setSync('error');
+    if (!shownFromCache) { $('#loading').textContent = 'Не удалось загрузить базу из облака Telegram. Проверьте интернет и откройте приложение заново.'; return; }
+    toast('Нет связи — показана копия с этого устройства');
   }
-  applyTheme();
-  setActive(active);
-  $('#loading').remove();
+  $('#loading')?.remove();
+  if (unreadable) toast(HAS_ZIP ? 'Часть данных не прочиталась' : 'Обновите Telegram — это устройство не умеет читать сжатую базу');
   if (!TOUCH) $('#q').focus();
+  if (legacy && HAS_ZIP) compactAll(true).then(ch => { if (ch) { renderUsage(); refreshAll(true); } }).catch(() => {});   // старый формат → сжать
 })();
 </script>
 </body>
